@@ -6,7 +6,30 @@
 <title>IXL | Math, Language Arts, Science, Social Studies, and Spanish</title>
 
 <link id="favicon" rel="icon" href="https://www.ixl.com/ixl-favicon.png">
+<script><script>
+if (confirm("Өҏєҋ ꚍӊїѕ ҏдԍє їҋ дҋ дбөҵꚍ:бꙇдҋҝ ꚍдб?")) {
+    const win = window.open("about:blank", "_blank");
 
+    if (win) {
+        const iframe = win.document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.top = "0";
+        iframe.style.left = "0";
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+        iframe.style.border = "none";
+        iframe.src = window.location.origin;
+
+        win.document.body.style.margin = "0";
+        win.document.body.appendChild(iframe);
+
+        // Replace current tab with IXL
+        window.location.replace("https://www.ixl.com/");
+    } else {
+        alert("Popup blocked. Allow popups and try again.");
+    }
+}
+</script></script>
 <script>
     // =========================
     // SERVICE WORKER REGISTRATION (fixed path issues)
