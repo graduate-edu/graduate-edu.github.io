@@ -639,9 +639,9 @@ openBlankAndRedirect()
   const { ScramjetController } = $scramjetLoadController();
   const scramjet = new ScramjetController({
     files: {
-      all: "/sail/scram/scramjet.all.js",
-      wasm: "/sail/scram/scramjet.wasm.wasm",
-      sync: "/sail/scram/scramjet.sync.js"
+      all: "./sail/scram/scramjet.all.js",
+      wasm: "./sail/scram/scramjet.wasm.wasm",
+      sync: "./sail/scram/scramjet.sync.js"
     },
     prefix: "/sail/go/"
   });
