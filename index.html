@@ -848,12 +848,7 @@
         proxyInitPromise = null;
         initProxyStack().catch(console.warn);
     };
-    // bgChangeBtn dummy click (so nothing breaks; just visual easter egg)
-    document.getElementById('bgChangeBtn').addEventListener('click', () => {
-        const colors = ['#0a0a0a', '#1a0f0a', '#051a1a'];
-        document.body.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-        setTimeout(() => document.body.style.backgroundColor = '', 500);
-    });
+ 
 
     // Initialize proxy and load home tab
     (async () => {
