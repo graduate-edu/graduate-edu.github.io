@@ -8,6 +8,44 @@
 
 <link id="favicon" rel="icon" href="https://www.ixl.com/ixl-favicon.png">
 
+
+
+
+
+
+
+
+
+      <script>
+            async function registerSW() {
+  if (!("serviceWorker" in navigator)) {
+    console.warn("Service workers not supported");
+    return;
+  }
+
+  try {
+    const reg = await navigator.serviceWorker.register("/sail/sw.js", {
+      scope: "./"
+    });
+
+    console.log("SW registered at scope:", reg.scope);
+
+    await navigator.serviceWorker.ready;
+
+    console.log("SW ready. Controller:", navigator.serviceWorker.controller);
+
+    if (!navigator.serviceWorker.controller) {
+      console.warn("SW installed but not controlling yet — refresh required");
+    }
+
+  } catch (err) {
+    console.error("SW registration failed:", err);
+  }
+}
+
+registerSW();
+            
+      </script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <script src="/sail/baremux/index.js"></script>
 <script src="/sail/scram/scramjet.all.js"></script>
