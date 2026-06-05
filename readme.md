@@ -1,0 +1,1 @@
+if anything on this repo is copyright infringing or just any dmca inquiries, please contact me at koshlandjg105@gmail.com.
