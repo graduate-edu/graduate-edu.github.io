@@ -674,8 +674,13 @@ openBlankAndRedirect()
   const DEFAULT_WS = "wss://wisp.mercurywork.shop/";
   let websocketURL = localStorage.getItem("websocketURL") || DEFAULT_WS;
 
+ let scramjet;
+let scramjetReady = false;
+
+async function initScramjet() {
   const { ScramjetController } = $scramjetLoadController();
-  const scramjet = new ScramjetController({
+
+  scramjet = new ScramjetController({
     files: {
       all: "/sail/scram/scramjet.all.js",
       wasm: "/sail/scram/scramjet.wasm.wasm",
@@ -683,7 +688,12 @@ openBlankAndRedirect()
     },
     prefix: "/sail/go/"
   });
-  scramjet.init();
+
+  await scramjet.init();
+
+  scramjetReady = true;
+  console.log("✔ Scramjet ready");
+}
 
   let connection;
   async function setupTransport() {
