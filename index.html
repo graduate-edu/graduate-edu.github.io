@@ -25,7 +25,7 @@
 
   try {
     const reg = await navigator.serviceWorker.register("/sail/sw.js", {
-      scope: "./"
+      scope: "/sail/"
     });
 
     console.log("SW registered at scope:", reg.scope);
