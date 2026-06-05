@@ -659,284 +659,267 @@ openBlankAndRedirect()
 </div>
 
 <script>
-  // ----------------------------- VANTA FOG
-  VANTA.FOG({
-    el: "#vanta-bg",
-    mouseControls: true,
-    touchControls: true,
-    highlightColor: 0xff5b2e,
-    midtoneColor: 0x220000,
-    lowlightColor: 0x000000,
-    baseColor: 0x000000
-  });
+ // =========================
+// VANTA
+// =========================
+VANTA.FOG({
+  el: "#vanta-bg",
+  mouseControls: true,
+  touchControls: true,
+  highlightColor: 0xff5b2e,
+  midtoneColor: 0x220000,
+  lowlightColor: 0x000000,
+  baseColor: 0x000000
+});
 
-  // ----------------------------- PROXY LOGIC (original preserved)
-  const DEFAULT_WS = "wss://wisp.mercurywork.shop/";
-  let websocketURL = localStorage.getItem("websocketURL") || DEFAULT_WS;
+// =========================
+// PROXY CORE (FIXED)
+// =========================
 
- let scramjet;
+const DEFAULT_WS = "wss://wisp.mercurywork.shop/";
+
+let websocketURL = localStorage.getItem("websocketURL") || DEFAULT_WS;
+
+let scramjet = null;
 let scramjetReady = false;
 
-async function initScramjet() {
-  const { ScramjetController } = $scramjetLoadController();
+let connection = null;
+let proxyReady = false;
 
-  scramjet = new ScramjetController({
-    files: {
-      all: "/sail/scram/scramjet.all.js",
-      wasm: "/sail/scram/scramjet.wasm.wasm",
-      sync: "/sail/scram/scramjet.sync.js"
-    },
-    prefix: "/sail/go/"
-  });
+let proxyInitPromise = null;
 
-  await scramjet.init();
+async function initProxyStack() {
+  if (proxyInitPromise) return proxyInitPromise;
 
-  scramjetReady = true;
-  console.log("✔ Scramjet ready");
+  proxyInitPromise = (async () => {
+    try {
+      // ---- Scramjet ----
+      const { ScramjetController } = $scramjetLoadController();
+
+      scramjet = new ScramjetController({
+        files: {
+          all: "/sail/scram/scramjet.all.js",
+          wasm: "/sail/scram/scramjet.wasm.wasm",
+          sync: "/sail/scram/scramjet.sync.js"
+        },
+        prefix: "/sail/go/"
+      });
+
+      await scramjet.init();
+      scramjetReady = true;
+      console.log("✔ Scramjet ready");
+
+      // ---- BareMux ----
+      connection = new BareMux.BareMuxConnection("/sail/baremux/worker.js");
+
+      await connection.setTransport("/sail/libcurl/index.mjs", [{
+        websocket: websocketURL
+      }]);
+
+      proxyReady = true;
+      console.log("✔ BareMux ready");
+      console.log("✔ Proxy stack fully ready");
+
+    } catch (err) {
+      console.error("❌ Proxy init failed:", err);
+      scramjetReady = false;
+      proxyReady = false;
+    }
+  })();
+
+  return proxyInitPromise;
 }
-      
- initScramjet();
 
-  let connection;
-  async function setupTransport() {
-    connection = new BareMux.BareMuxConnection("/sail/baremux/worker.js");
-    await connection.setTransport("/sail/libcurl/index.mjs", [{
-      websocket: websocketURL
-    }]);
+// =========================
+// SAFE UTILITIES
+// =========================
+
+function requireProxy() {
+  if (!scramjetReady || !proxyReady) {
+    alert("Proxy is still loading. Try again in a second.");
+    return false;
   }
-  setupTransport();
+  return true;
+}
 
-  // DOM elements
-  const homePanel = document.getElementById('homePanel');
-  const browserFrame = document.getElementById('frame');
-  const urlInput = document.getElementById('urlInput');
-  const tabsContainer = document.getElementById('tabsContainer');
-  const addTabBtn = document.getElementById('addTab');
-  const reloadBtn = document.getElementById('reloadBtn');
-  const goBtn = document.getElementById('goBtn');
-  const privacyBtn = document.getElementById('privacyBtn');
-  const bgChangeBtn = document.getElementById('bgChangeBtn');
-  const resetAllBtn = document.getElementById('resetAllBtn');
-  const settingsModal = document.getElementById('settings');
-  const wsInput = document.getElementById('wsInput');
-  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-  const settingsNavBtn = document.getElementById('settingsNavBtn');
+function normalizeUrl(value) {
+  value = value.trim();
+  if (!value) return '';
 
-  let activeTabId = 0;
-  let tabs = [{ id: 0, url: '', title: 'ӊөӎє' }];
-
-  // normalize URL (search / http)
-  function normalizeUrl(value) {
-    value = value.trim();
-    if (!value) return '';
-    if (!value.includes('.') && !value.startsWith('http') && !value.includes('://')) {
-      return "https://search.brave.com/search?q=" + encodeURIComponent(value);
-    }
-    if (!/^https?:\/\//i.test(value)) {
-      return "https://" + value;
-    }
-    return value;
+  if (!value.includes('.') && !value.startsWith('http') && !value.includes('://')) {
+    return "https://search.brave.com/search?q=" + encodeURIComponent(value);
   }
 
-  function getEncodedProxyUrl(rawUrl) {
-    if (!rawUrl) return '';
+  if (!/^https?:\/\//i.test(value)) {
+    return "https://" + value;
+  }
+
+  return value;
+}
+
+function getEncodedProxyUrl(rawUrl) {
+  if (!rawUrl) return '';
+  if (!scramjetReady || !scramjet?.encodeUrl) return '';
+
+  try {
     return scramjet.encodeUrl(rawUrl);
+  } catch (e) {
+    console.error("encodeUrl failed:", e);
+    return '';
   }
+}
 
-  function loadTab(tabId) {
-    const tab = tabs.find(t => t.id === tabId);
-    if (!tab) return;
-    activeTabId = tabId;
-    if (tab.url && tab.url !== '') {
-      homePanel.style.display = 'none';
+// =========================
+// TAB SYSTEM
+// =========================
+
+const homePanel = document.getElementById('homePanel');
+const browserFrame = document.getElementById('frame');
+const urlInput = document.getElementById('urlInput');
+const tabsContainer = document.getElementById('tabsContainer');
+const addTabBtn = document.getElementById('addTab');
+
+let activeTabId = 0;
+let tabs = [{ id: 0, url: '', title: 'home' }];
+
+function loadTab(tabId) {
+  const tab = tabs.find(t => t.id === tabId);
+  if (!tab) return;
+
+  activeTabId = tabId;
+
+  if (tab.url) {
+    homePanel.style.display = 'none';
+    browserFrame.style.display = 'block';
+
+    const proxyUrl = getEncodedProxyUrl(tab.url);
+    if (!proxyUrl) return;
+
+    browserFrame.onload = () => {
       browserFrame.style.display = 'block';
-      const proxyUrl = getEncodedProxyUrl(tab.url);
-      browserFrame.src = proxyUrl;
-      urlInput.value = tab.url;
-    } else {
-      browserFrame.style.display = 'none';
-      homePanel.style.display = 'flex';
-      urlInput.value = '';
-      browserFrame.src = 'about:blank';
-    }
-    updateTabsUI();
+    };
+
+    browserFrame.src = proxyUrl;
+    urlInput.value = tab.url;
+  } else {
+    browserFrame.style.display = 'none';
+    homePanel.style.display = 'flex';
+    browserFrame.src = 'about:blank';
+    urlInput.value = '';
   }
 
-  function updateTabsUI() {
-    const existing = document.querySelectorAll('.tab:not([data-addbtn])');
-    existing.forEach(el => el.remove());
-    tabs.forEach(tab => {
-      const tabEl = document.createElement('div');
-      tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
-      tabEl.setAttribute('data-id', tab.id);
-      const titleSpan = document.createElement('span');
-      let displayTitle = tab.title || (tab.url ? new URL(tab.url).hostname : 'иєω тαв');
-      if (displayTitle.length > 18) displayTitle = displayTitle.slice(0, 15) + '..';
-      titleSpan.innerText = displayTitle;
-      const closeSpan = document.createElement('span');
-      closeSpan.className = 'close';
-      closeSpan.innerHTML = '×';
-      tabEl.appendChild(titleSpan);
-      tabEl.appendChild(closeSpan);
-      tabEl.addEventListener('click', (e) => {
-        if (e.target === closeSpan) return;
-        loadTab(tab.id);
-      });
-      closeSpan.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (tabs.length === 1) {
-          tabs[0].url = '';
-          tabs[0].title = 'ӊөӎє';
-          loadTab(0);
-        } else {
-          const idx = tabs.findIndex(t => t.id === tab.id);
-          if (idx !== -1) tabs.splice(idx, 1);
-          if (activeTabId === tab.id) {
-            loadTab(tabs[0].id);
-          } else {
-            updateTabsUI();
-          }
-        }
-      });
-      tabsContainer.insertBefore(tabEl, addTabBtn);
-    });
-  }
+  updateTabsUI();
+}
 
-  function createNewTab() {
-    const newId = Date.now();
-    tabs.push({ id: newId, url: '', title: 'иєω тαв' });
-    activeTabId = newId;
-    loadTab(newId);
-  }
+function updateTabsUI() {
+  document.querySelectorAll('.tab:not([data-addbtn])').forEach(el => el.remove());
 
-  function navigateTo(urlRaw) {
-    const finalUrl = normalizeUrl(urlRaw);
-    if (!finalUrl) return;
-    const activeTab = tabs.find(t => t.id === activeTabId);
-    if (activeTab) {
-      activeTab.url = finalUrl;
-      try {
-        const host = new URL(finalUrl).hostname;
-        activeTab.title = host;
-      } catch(e) { activeTab.title = finalUrl.slice(0, 20); }
-      loadTab(activeTabId);
-    }
-  }
+  tabs.forEach(tab => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
 
-  function reloadCurrent() {
-    const activeTab = tabs.find(t => t.id === activeTabId);
-    if (activeTab && activeTab.url) {
-      const proxySrc = getEncodedProxyUrl(activeTab.url);
-      browserFrame.src = proxySrc;
-    }
-  }
+    const title = document.createElement('span');
+    let name = tab.title || 'tab';
 
-  // bookmarks
-  document.querySelectorAll('.bookmark-item').forEach(el => {
-    el.addEventListener('click', () => {
-      const targetUrl = el.getAttribute('data-url');
-      if (targetUrl) navigateTo(targetUrl);
-    });
+    if (name.length > 18) name = name.slice(0, 15) + '..';
+
+    title.innerText = name;
+
+    const close = document.createElement('span');
+    close.className = 'close';
+    close.innerHTML = '×';
+
+    el.appendChild(title);
+    el.appendChild(close);
+
+    el.onclick = (e) => {
+      if (e.target === close) return;
+      loadTab(tab.id);
+    };
+
+    close.onclick = (e) => {
+      e.stopPropagation();
+
+      if (tabs.length === 1) {
+        tabs[0].url = '';
+        tabs[0].title = 'home';
+        loadTab(0);
+        return;
+      }
+
+      tabs = tabs.filter(t => t.id !== tab.id);
+
+      if (activeTabId === tab.id) {
+        loadTab(tabs[0].id);
+      } else {
+        updateTabsUI();
+      }
+    };
+
+    tabsContainer.insertBefore(el, addTabBtn);
   });
+}
 
-  addTabBtn.addEventListener('click', createNewTab);
-  goBtn.addEventListener('click', () => navigateTo(urlInput.value));
-  reloadBtn.addEventListener('click', reloadCurrent);
-  urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') navigateTo(urlInput.value); });
+function createNewTab() {
+  const id = Date.now();
+  tabs.push({ id, url: '', title: 'new tab' });
+  loadTab(id);
+}
 
-  // privacy mode
-  function togglePrivacy() {
-    document.body.classList.toggle('privacy');
-    privacyBtn.classList.toggle('green');
+function navigateTo(raw) {
+  if (!requireProxy()) return;
+
+  const url = normalizeUrl(raw);
+  if (!url) return;
+
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab) return;
+
+  tab.url = url;
+
+  try {
+    tab.title = new URL(url).hostname;
+  } catch {
+    tab.title = url.slice(0, 20);
   }
-  privacyBtn.addEventListener('click', togglePrivacy);
 
-  // background changer 
-  bgChangeBtn.addEventListener('click', () => {
-    const imgUrl = prompt('єитєя ρα¢к gяσυη∂ image URL (σя ℓєανє ємρту)');
-    if (imgUrl) {
-      document.getElementById('vanta-bg').style.background = `url(${imgUrl}) center/cover no-repeat`;
-    } else {
-      document.getElementById('vanta-bg').style.background = '';
-    }
-  });
+  loadTab(activeTabId);
+}
 
-  resetAllBtn.addEventListener('click', () => {
-    localStorage.clear();
-    location.reload();
-  });
+function reloadCurrent() {
+  if (!requireProxy()) return;
 
-  settingsNavBtn.addEventListener('click', () => {
-    wsInput.value = websocketURL;
-    settingsModal.style.display = 'flex';
-  });
-  closeSettingsBtn.addEventListener('click', () => settingsModal.style.display = 'none');
-  saveSettingsBtn.addEventListener('click', async () => {
-    const newWs = wsInput.value.trim();
-    if (newWs) {
-      websocketURL = newWs;
-      localStorage.setItem('websocketURL', websocketURL);
-      await setupTransport();
-      alert('ρяσxÿ тяαηѕρσят υρ∂αтє∂. яєℓσα∂ α¢тινє ραgєѕ.');
-    }
-    settingsModal.style.display = 'none';
-  });
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab?.url) return;
 
-  function updateUTCClock() {
-    const now = new Date();
-    const year = now.getUTCFullYear();
-    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(now.getUTCDate()).padStart(2, '0');
-    const hours = String(now.getUTCHours()).padStart(2, '0');
-    const minutes = String(now.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(now.getUTCSeconds()).padStart(2, '0');
-    
-    // date: YYYY-MM-DD (UTC)
-    document.getElementById('date').innerHTML = `${year}-${month}-${day}`;
-    // clock with blinking colon
-    document.getElementById('clock').innerHTML = `${hours}<span style="opacity:${Date.now() % 1000 < 500 ? 1 : 0.3}">:</span>${minutes}`;
-    // full precision for screensaver
-    document.getElementById('bigClockDisplay').innerHTML = `${hours}:${minutes}:${seconds}`;
-    document.getElementById('bigDateDisplay').innerHTML = `${year}-${month}-${day} UTC`;
-  }
-  setInterval(updateUTCClock, 200);
-  updateUTCClock();
+  browserFrame.src = getEncodedProxyUrl(tab.url);
+}
 
-  // idle screensaver (30 seconds)
-  let idleSeconds = 30;
-  function resetIdleTimer() {
-    idleSeconds = 30;
-    const saver = document.getElementById('screensaver');
-    if (saver.style.display === 'flex') saver.style.display = 'none';
-    updateWaitDisplay();
-  }
-  function updateWaitDisplay() {
-    const waitDiv = document.getElementById('waitTimer');
-    if (idleSeconds <= 0) waitDiv.innerText = '💤 ѕ¢яєєηѕανєя';
-    else waitDiv.innerText = `⏳ ѕтαη∂ву ${idleSeconds}s`;
-  }
-  setInterval(() => {
-    if (idleSeconds <= 0) {
-      if (document.getElementById('screensaver').style.display !== 'flex')
-        document.getElementById('screensaver').style.display = 'flex';
-    } else {
-      idleSeconds--;
-      updateWaitDisplay();
-    }
-  }, 1000);
-  ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(ev => {
-    window.addEventListener(ev, resetIdleTimer);
-  });
-  resetIdleTimer();
-  
-  document.getElementById('screensaver').addEventListener('click', () => {
-    document.getElementById('screensaver').style.display = 'none';
-    resetIdleTimer();
-  });
+// =========================
+// EVENTS
+// =========================
 
-  // load initial state
+addTabBtn.onclick = createNewTab;
+
+document.getElementById('goBtn').onclick = () =>
+  navigateTo(urlInput.value);
+
+urlInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') navigateTo(urlInput.value);
+});
+
+document.getElementById('reloadBtn').onclick = reloadCurrent;
+
+document.querySelectorAll('.bookmark-item').forEach(el => {
+  el.onclick = () => navigateTo(el.dataset.url);
+});
+
+
+
+(async () => {
+  await initProxyStack();
   loadTab(0);
+})();
 </script>
 </body>
 </html>
