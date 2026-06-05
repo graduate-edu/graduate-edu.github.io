@@ -650,7 +650,7 @@ openBlankAndRedirect()
   let connection;
   async function setupTransport() {
     connection = new BareMux.BareMuxConnection("/sail/baremux/worker.js");
-    await connection.setTransport("/sail/libcurl/index.mjs", [{
+    await connection.setTransport("./sail/libcurl/index.mjs", [{
       websocket: websocketURL
     }]);
   }
