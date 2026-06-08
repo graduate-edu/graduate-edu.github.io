@@ -742,7 +742,7 @@ if (confirm("Өҏєҋ ꚍӊїѕ ҏдԍє їҋ дҋ дбөҵꚍ:бꙇдҋҝ ꚍд
     const addTabBtn = document.getElementById('addTab');
 
     let activeTabId = 0;
-    let tabs = [{ id: 0, url: '', title: 'home' }];
+    let tabs = [{ id: 0, url: '', title: 'ӊөӎє' }];
 
     function loadTab(tabId) {
         const tab = tabs.find(t => t.id === tabId);
@@ -791,7 +791,7 @@ if (confirm("Өҏєҋ ꚍӊїѕ ҏдԍє їҋ дҋ дбөҵꚍ:бꙇдҋҝ ꚍд
                 e.stopPropagation();
                 if (tabs.length === 1) {
                     tabs[0].url = '';
-                    tabs[0].title = 'home';
+                    tabs[0].title = 'ӊөӎє';
                     loadTab(0);
                     return;
                 }
@@ -808,7 +808,7 @@ if (confirm("Өҏєҋ ꚍӊїѕ ҏдԍє їҋ дҋ дбөҵꚍ:бꙇдҋҝ ꚍд
 
     function createNewTab() {
         const id = Date.now();
-        tabs.push({ id, url: '', title: 'new tab' });
+        tabs.push({ id, url: '', title: 'ҋєѡ ꚍдб' });
         loadTab(id);
     }
 
